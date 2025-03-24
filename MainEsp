@@ -1,6 +1,15 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Function to add highlight effect
+-- Create a RemoteEvent for communication (Server to Client)
+local aimEvent = Instance.new("RemoteEvent")
+aimEvent.Name = "AimbotEvent"
+aimEvent.Parent = ReplicatedStorage
+
+-- Target player username
+local targetUsername = "HelloGuysscript"
+
+-- Function to add highlight effect (ESP)
 local function addHighlight(character)
     if character and not character:FindFirstChild("Highlight") then
         local highlight = Instance.new("Highlight")
@@ -12,27 +21,82 @@ local function addHighlight(character)
     end
 end
 
--- Function to handle player joining
-local function onPlayerAdded(player)
-    -- Apply highlight when character loads
-    player.CharacterAdded:Connect(function(character)
-        addHighlight(character)
-    end)
-
-    -- If player already has a character, apply immediately
-    if player.Character then
-        addHighlight(player.Character)
+-- Function to increase walk speed
+local function increaseWalkSpeed(character)
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        -- Set WalkSpeed to 23 (increased speed)
+        humanoid.WalkSpeed = 23
     end
 end
 
--- Connect player events
-Players.PlayerAdded:Connect(onPlayerAdded)
+-- Function to reset walk speed to normal (19)
+local function resetWalkSpeed(character)
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        -- Set WalkSpeed to 19 (default speed)
+        humanoid.WalkSpeed = 19
+    end
+end
 
--- Update highlights every second to include new players
-while true do
-    for _, player in pairs(Players:GetPlayers()) do
+-- Function to handle player joining and applying ESP and WalkSpeed
+local function onPlayerAdded(player)
+    -- Only apply to the target player "HelloGuysscript"
+    if player.Name == targetUsername then
+        player.CharacterAdded:Connect(function(character)
+            -- Apply highlight when character loads
+            addHighlight(character)
+
+            -- Increase WalkSpeed to 23 when character loads
+            increaseWalkSpeed(character)
+
+            -- Continuously send the nearest player data to the client for aimbot
+            while character and character.Parent do
+                local nearestPlayer = getNearestPlayer(character)
+                if nearestPlayer then
+                    -- Send data to the client to adjust the camera (aimbot)
+                    aimEvent:FireClient(player, nearestPlayer.Character.HumanoidRootPart.Position)
+                end
+                wait(0.1)  -- Update every 0.1 seconds
+            end
+        end)
+
+        -- If the player is already in the game with a character, apply ESP and WalkSpeed
         if player.Character then
             addHighlight(player.Character)
+            increaseWalkSpeed(player.Character)
+        end
+    end
+end
+
+-- Function to get the nearest player to a given character
+local function getNearestPlayer(character)
+    local nearestPlayer = nil
+    local shortestDistance = math.huge
+
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer.Character and otherPlayer.Character ~= character then
+            local playerPosition = otherPlayer.Character.HumanoidRootPart.Position
+            local distance = (playerPosition - character.HumanoidRootPart.Position).magnitude
+
+            if distance < shortestDistance then
+                shortestDistance = distance
+                nearestPlayer = otherPlayer
+            end
+        end
+    end
+    return nearestPlayer
+end
+
+-- Connect player added event
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Update highlights and walk speed every second to include new players
+while true do
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Name == targetUsername and player.Character then
+            addHighlight(player.Character)
+            increaseWalkSpeed(player.Character)  -- Ensure WalkSpeed is applied only to "HelloGuysscript"
         end
     end
     wait(1)
